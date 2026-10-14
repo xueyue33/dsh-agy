@@ -14,7 +14,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { randomBytes, randomUUID } from 'node:crypto'
-import { AGY_IDE_TYPE, AGY_PLATFORM_ENUM, currentAgyVersion } from '../oauth/constants.ts'
+import { AGY_IDE_TYPE, AGY_PLATFORM_ENUM, antigravityUserAgent, currentAgyVersion } from '../oauth/constants.ts'
 import { migrateToAgyDir } from '../store/paths.ts'
 import type { ClientMetadata, Fingerprint, FingerprintVersion } from '../types.ts'
 import fingerprintData from './fingerprint-data.json'
@@ -84,7 +84,7 @@ export function generateFingerprint(
   return {
     deviceId: randomUUID(),
     sessionToken: randomBytes(16).toString('hex'),
-    userAgent: `antigravity/${version} ${platform}`,
+    userAgent: antigravityUserAgent(version, platform),
     apiClient: randomFrom(data.sdkClients),
     // The metadata message, not a header (see `ClientMetadata` in types.ts). The
     // version is stamped here as well as in the UA because the official message
@@ -120,7 +120,7 @@ export function getRandomizedHeaders(
 ): ImpersonationHeaders {
   const platform = randomFrom(data.platforms)
   return {
-    'User-Agent': `antigravity/${version} ${platform}`,
+    'User-Agent': antigravityUserAgent(version, platform),
     'X-Goog-Api-Client': randomFrom(data.sdkClients),
     clientMetadata: {
       ideType: randomFrom(data.ideTypes),
@@ -148,7 +148,7 @@ export function getStableHeaders(
   // (that staleness is the detectable signal this module exists to avoid).
   const resolved = version || currentAgyVersion()
   return {
-    'User-Agent': `antigravity/${resolved} ${platform}`,
+    'User-Agent': antigravityUserAgent(resolved, platform),
     'X-Goog-Api-Client': data.sdkClients[0] ?? '',
     clientMetadata: {
       ideType: data.ideTypes[0] ?? AGY_IDE_TYPE,
@@ -165,7 +165,7 @@ export function getStableHeaders(
  * and letting them drift is how one account comes to look like two clients.
  */
 export function updateFingerprintVersion(fingerprint: Fingerprint, version: string): boolean {
-  const pattern = /^(antigravity\/)([\d.]+)/
+  const pattern = /^(antigravity\/(?:cli\/)?)([\d.]+)/
   const match = fingerprint.userAgent.match(pattern)
   const uaChanged = match !== null && match[2] !== version
   if (uaChanged) fingerprint.userAgent = fingerprint.userAgent.replace(pattern, `$1${version}`)

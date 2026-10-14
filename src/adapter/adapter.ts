@@ -223,15 +223,11 @@ export function buildRequestHeaders(session: AgyAccountSession): Record<string, 
     authorization: `Bearer ${session.auth.access}`,
     'content-type': 'application/json',
     accept: 'text/event-stream',
-    // Exactly the two impersonation HEADERS, named individually rather than
+    // Exactly the client User-Agent header, named individually rather than
     // spread. `session.impersonation.clientMetadata` is a body message and must
-    // not become a header — and it is deliberately not added to this envelope
-    // either: the only `metadata` field the official descriptor evidences is on
-    // the control-plane calls (`LoadCodeAssistRequest`/`OnboardUserRequest`), so
-    // on this generate request the identity carrier is the body's existing
-    // `userAgent`/`requestType` pair.
+    // not become a header — and `X-Goog-Api-Client` is omitted on the Cloud Code
+    // v1internal stream path to match the official `agy` CLI wire headers.
     'User-Agent': session.impersonation['User-Agent'],
-    'X-Goog-Api-Client': session.impersonation['X-Goog-Api-Client'],
   }
 }
 

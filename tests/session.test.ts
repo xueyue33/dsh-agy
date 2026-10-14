@@ -61,7 +61,7 @@ describe('AgySessionManager', () => {
     const session = await sessions.getSession()
     expect(session).toBeDefined()
     expect(session!.auth.access).toBe('at')
-    expect(session!.impersonation['User-Agent']).toMatch(/^antigravity\/\d+\.\d+\.\d+/)
+    expect(session!.impersonation['User-Agent']).toMatch(/^antigravity\/cli\/\d+\.\d+\.\d+/)
     expect(session!.impersonation.clientMetadata.ideType).toContain('ANTIGRAVITY')
   })
 
@@ -75,7 +75,7 @@ describe('AgySessionManager', () => {
     const store = new InMemoryAccountStore(storage([{ ...account(), fingerprint: fp }]))
     const sessions = new AgySessionManager({ store })
     const session = await sessions.getSession()
-    expect(session!.impersonation['User-Agent']).toBe('antigravity/9.9.9 darwin/arm64')
+    expect(session!.impersonation['User-Agent']).toBe('antigravity/cli/9.9.9 (aidev_client; os_type=darwin; arch=arm64; auth_method=consumer)')
     expect(session!.impersonation['X-Goog-Api-Client']).toBe('fixed-client')
   })
 
@@ -739,7 +739,7 @@ describe('usage-driven selection', () => {
       const first = impersonationHeadersFor(account('a@x'))
       const second = impersonationHeadersFor(account('a@x'))
       expect(first).toEqual(second)
-      expect(first['User-Agent']).toMatch(/^antigravity\/\d+\.\d+\.\d+ \S+$/)
+      expect(first['User-Agent']).toMatch(/^antigravity\/cli\/\d+\.\d+\.\d+ \(aidev_client; .+\)$/)
       expect(first.clientMetadata.ideType).toContain('ANTIGRAVITY')
       vi.unstubAllEnvs()
     }
@@ -1296,7 +1296,7 @@ describe('impersonationHeadersFor', () => {
     const fp = { deviceId: 'd', sessionToken: 's', userAgent: 'antigravity/1.0.0 windows/amd64', apiClient: 'c', clientMetadata: { ideType: 'ANTIGRAVITY' }, createdAt: 0 }
     const stable = impersonationHeadersFor({ ...base, fingerprint: fp })
     expect(stable).toEqual({
-      'User-Agent': 'antigravity/1.0.0 windows/amd64',
+      'User-Agent': 'antigravity/cli/1.0.0 (aidev_client; os_type=windows; arch=amd64; auth_method=consumer)',
       'X-Goog-Api-Client': 'c',
       clientMetadata: { ideType: 'ANTIGRAVITY' },
     })
@@ -1633,7 +1633,7 @@ describe('fingerprint version freshness', () => {
 
       const fp = (await store.load()).accounts[0]!.fingerprint!
       expect(fp.userAgent).not.toContain('1.22.2')
-      expect(fp.userAgent).toMatch(/^antigravity\/\d+\.\d+\.\d+ darwin\/arm64$/)
+      expect(fp.userAgent).toMatch(/^antigravity\/cli\/\d+\.\d+\.\d+ \(aidev_client; os_type=darwin; arch=arm64; auth_method=consumer\)$/)
     } finally {
       _setFingerprintDataForTest(undefined)
       vi.unstubAllGlobals()

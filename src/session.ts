@@ -43,7 +43,7 @@ import {
 import { deriveAntigravitySessionId, generateAntigravityRequestId } from './runtime/identity.ts'
 import { fingerprintMode } from './runtime/risk.ts'
 import { peekCachedAntigravityVersion, resolveAntigravityVersionBounded } from './runtime/version.ts'
-import { currentAgyVersion } from './oauth/constants.ts'
+import { currentAgyVersion, normalizeAgyCliUserAgent } from './oauth/constants.ts'
 import { accountFetch, isProxyUnreachableError, probeFetch, proxiedFetch } from './proxy.ts'
 import { describeFetchError } from './runtime/classify.ts'
 import type { Fingerprint } from './types.ts'
@@ -195,7 +195,7 @@ export function impersonationHeadersFor(account: ManagedAccount): AgyAccountSess
   const fingerprint = account.fingerprint
   if (fingerprint) {
     return {
-      'User-Agent': fingerprint.userAgent,
+      'User-Agent': normalizeAgyCliUserAgent(fingerprint.userAgent),
       'X-Goog-Api-Client': fingerprint.apiClient,
       clientMetadata: fingerprint.clientMetadata,
     }
@@ -1264,7 +1264,6 @@ export class AgySessionManager {
         'content-type': 'application/json',
         accept: 'text/event-stream',
         'User-Agent': session.impersonation['User-Agent'],
-        'X-Goog-Api-Client': session.impersonation['X-Goog-Api-Client'],
       }
       const routing = { proxyUrl: session.account.proxy, streaming: true }
       const response = await fetchAgyFirstOk(

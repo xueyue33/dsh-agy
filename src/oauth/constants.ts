@@ -138,7 +138,7 @@ export async function fetchAgyFirstOk(
  * numerically is meaningless and mixing them advertises a version that does not
  * exist for the product we name.
  */
-export const AGY_VERSION_FALLBACK = '1.2.9'
+export const AGY_VERSION_FALLBACK = '1.3.4'
 
 /**
  * `ClientMetadata.platform` value: the proto enum NAME, as protobuf-JSON emits it.
@@ -178,20 +178,37 @@ export function currentAgyVersion(): string {
   return resolvedAgyVersion ?? AGY_VERSION_FALLBACK
 }
 
-/** Electron-style UA used for bootstrap calls (loadCodeAssist/onboardUser). */
+/**
+ * Official CLI User-Agent format:
+ * `antigravity/cli/<version> (aidev_client; os_type=<os>; arch=<arch>; auth_method=consumer)`
+ *
+ * Also normalizes legacy `antigravity/<version> <os>/<arch>` fingerprint strings
+ * into the CLI format while preserving their stored version/os/arch.
+ */
+export function formatAgyCliUserAgent(version = currentAgyVersion(), platform = 'darwin/arm64'): string {
+  const [osType = 'darwin', arch = 'arm64'] = platform.split('/')
+  return `antigravity/cli/${version} (aidev_client; os_type=${osType}; arch=${arch}; auth_method=consumer)`
+}
+
+export function normalizeAgyCliUserAgent(ua: string): string {
+  if (ua.startsWith('antigravity/cli/')) return ua
+  const match = /^antigravity\/([^\s/]+)\s+([^\s/]+)\/(\S+)/.exec(ua)
+  if (match) {
+    return formatAgyCliUserAgent(match[1], `${match[2]}/${match[3]}`)
+  }
+  return formatAgyCliUserAgent()
+}
+
+/** CLI User-Agent used for bootstrap and control-plane calls (loadCodeAssist/onboardUser/fetchAvailableModels). */
 export function getAgyBootstrapUserAgent(version = currentAgyVersion()): string {
-  return `Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Antigravity/${version} Chrome/138.0.7204.235 Electron/37.3.1 Safari/537.36`
+  return formatAgyCliUserAgent(version)
 }
 
 /**
- * Short-form client User-Agent: `antigravity/<version> <platform>`.
- *
- * Used where the full Electron string would be inappropriate but the request
- * must still not self-identify as this tool (e.g. the version feeds, which the
- * official client ecosystem also polls).
+ * Client User-Agent: `antigravity/cli/<version> (aidev_client; os_type=<os>; arch=<arch>; auth_method=consumer)`.
  */
 export function antigravityUserAgent(version = currentAgyVersion(), platform = 'darwin/arm64'): string {
-  return `antigravity/${version} ${platform}`
+  return formatAgyCliUserAgent(version, platform)
 }
 
 /**

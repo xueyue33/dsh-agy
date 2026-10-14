@@ -2014,20 +2014,20 @@ describe('buildRequestHeaders', () => {
     expect(headers.get('user-agent')).not.toContain(',')
   })
 
-  it('carries the two impersonation headers and nothing invented', () => {
+  it('carries the client User-Agent header and omits X-Goog-Api-Client on the wire', () => {
     const headers = buildRequestHeaders(session({
-      'User-Agent': 'antigravity/2.0.0 darwin/arm64',
+      'User-Agent': 'antigravity/cli/2.0.0 (aidev_client; os_type=darwin; arch=arm64; auth_method=consumer)',
       'X-Goog-Api-Client': 'google-cloud-sdk vscode/1.96.0',
       clientMetadata: { ideType: 'ANTIGRAVITY' },
     }))
 
     expect(headers.authorization).toBe('Bearer at')
-    expect(headers['X-Goog-Api-Client']).toBe('google-cloud-sdk vscode/1.96.0')
+    expect(headers['X-Goog-Api-Client']).toBeUndefined()
     // Neither of these is an official shape: `Client-Metadata` and
     // `x-goog-request-id` are both absent from BOTH official binaries, and the
     // request id the backend correlates on is the body's `requestId` field.
     expect(Object.keys(headers).sort()).toEqual(
-      ['User-Agent', 'X-Goog-Api-Client', 'accept', 'authorization', 'content-type'],
+      ['User-Agent', 'accept', 'authorization', 'content-type'],
     )
     // The metadata message is not a header and must not be spread as one.
     expect(headers).not.toHaveProperty('clientMetadata')
