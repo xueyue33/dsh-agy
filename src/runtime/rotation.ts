@@ -223,10 +223,9 @@ export function decideRotation(
       return { action: 'cool', backoffMs: VERIFICATION_COOLDOWN_MS }
     }
     case 'network-error': {
-      account.coolingDownUntil = now + backoffMs
-      account.cooldownReason = 'network-error'
-      account.cooldownSetAt = now
-      return { action: 'rotate', backoffMs }
+      // Transient transport/network errors should retry on the current account
+      // without cooling it down or rotating to another account.
+      return { action: 'retry', backoffMs }
     }
     case 'project-error': {
       account.coolingDownUntil = now + backoffMs

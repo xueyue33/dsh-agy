@@ -827,7 +827,7 @@ export class AgySessionManager {
       && !isFamilyRateLimited(acc, familyKey, now)
       && !isFamilyQuotaExhausted(acc, family, now)
 
-    if (isActiveUsable(active) && this.inFlightCount(this.accountKey(active), now) < MAX_IN_FLIGHT_PER_ACCOUNT) {
+    if (isActiveUsable(active)) {
       return { account: active, index: storage.activeIndex }
     }
 
@@ -1164,16 +1164,18 @@ export class AgySessionManager {
       }
 
       if (decision.action === 'rotate' || decision.action === 'cool') {
-        const currentIndex = storage.accounts.findIndex((a) => this.accountKey(a) === key)
-        const familyKey = familyKeyOf(info?.model)
-        const nextIndex = pickNextAccountIndex(storage.accounts, currentIndex >= 0 ? currentIndex : storage.activeIndex, Date.now(), familyKey)
-        if (nextIndex !== storage.activeIndex) {
-          storage.activeIndex = nextIndex
-          nextIndexToRotate = nextIndex
+        if (kind === 'rate-limit' || kind === 'verification-required') {
+          const currentIndex = storage.accounts.findIndex((a) => this.accountKey(a) === key)
+          const familyKey = familyKeyOf(info?.model)
+          const nextIndex = pickNextAccountIndex(storage.accounts, currentIndex >= 0 ? currentIndex : storage.activeIndex, Date.now(), familyKey)
+          if (nextIndex !== storage.activeIndex) {
+            storage.activeIndex = nextIndex
+            nextIndexToRotate = nextIndex
+          }
+          // Only conversations pinned to the failed account are freed; a pin on
+          // another account was never this failure's business.
+          this.clearAffinityForAccount(key)
         }
-        // Only conversations pinned to the failed account are freed; a pin on
-        // another account was never this failure's business.
-        this.clearAffinityForAccount(key)
       }
     })
 

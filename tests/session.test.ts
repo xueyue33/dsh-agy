@@ -193,6 +193,26 @@ describe('AgySessionManager', () => {
     expect(rotations).toEqual(['0->1'])
   })
 
+  it('does not rotate or cool the active account on network-error or transient failures', async () => {
+    stubTokenEndpoint()
+    const store = new InMemoryAccountStore(storage([account('a@x'), account('b@x')], 0))
+    const rotations: string[] = []
+    const sessions = new AgySessionManager({ store, onRotate: (from, to) => rotations.push(`${from}->${to}`) })
+
+    const session = await sessions.getSession('gemini-4-argon-medium', undefined, 'chat-1')
+    expect(session!.index).toBe(0)
+
+    await sessions.reportFailure('network-error', session!)
+    await sessions.reportFailure('transient', session!)
+    const after = await store.load()
+    expect(after.activeIndex).toBe(0)
+    expect(after.accounts[0]!.coolingDownUntil).toBeUndefined()
+    expect(rotations).toEqual([])
+
+    const next = await sessions.getSession('gemini-4-argon-medium', undefined, 'chat-1')
+    expect(next!.index).toBe(0)
+  })
+
   it('regenerates the fingerprint on repeated rate-limits (bounded history)', async () => {
     stubTokenEndpoint()
     const store = new InMemoryAccountStore(storage([account()]))
@@ -426,26 +446,22 @@ describe('usage-driven selection', () => {
     expect(session!.index).toBe(0)
   })
 
-  it('spreads concurrent fan-out off an account that is at its in-flight cap', async () => {
+  it('keeps the active account even when it is at its in-flight cap (no non-429 rotation)', async () => {
     stubTokenEndpoint()
     const a = account('a@x')
     const b = account('b@x')
     const store = new InMemoryAccountStore(storage([a, b], 0))
     const sessions = new AgySessionManager({ store })
 
-    // Saturate account 0 (the one plain ranking would choose) and confirm the next
-    // unrelated conversation is steered to account 1 instead of stacking on it.
+    // Saturate account 0 (the active account) and confirm the next conversation
+    // stays on the active account rather than rotating away when not rate-limited.
     for (let i = 0; i < MAX_IN_FLIGHT_PER_ACCOUNT; i++) sessions.noteRequestStarted(a)
     const spread = await sessions.getSession('gemini-3-flash', undefined, 'session-C')
-    expect(spread!.index).toBe(1)
+    expect(spread!.index).toBe(0)
 
-    // Settling frees it again. Re-seed activeIndex first: spreading rotated it to
-    // 1, and ranking is deliberately biased to the active index, which would
-    // otherwise mask whether the cap still excludes account 0.
     sessions.noteRequestSettled(a)
     sessions.noteRequestSettled(a)
     sessions.noteRequestSettled(a)
-    await store.mutate((s) => { s.activeIndex = 0 })
     const back = await sessions.getSession('gemini-3-flash', undefined, 'session-D')
     expect(back!.index).toBe(0)
   })

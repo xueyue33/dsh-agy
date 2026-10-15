@@ -340,11 +340,14 @@ describe('rotation state machine', () => {
     expect(acc.verificationRequired).toBeUndefined()
   })
 
-  it('backs off exponentially across tiers', () => {
+  it('retries network-error without cooling down or rotating the account, and backs off exponentially', () => {
     const acc = account()
     const d0 = decideRotation('network-error', acc, 0)
+    expect(d0.action).toBe('retry')
+    expect(acc.coolingDownUntil).toBeUndefined()
     const acc5 = account()
     const d5 = decideRotation('network-error', acc5, 5)
+    expect(d5.action).toBe('retry')
     expect(d5.backoffMs).toBeGreaterThan(d0.backoffMs)
   })
 
