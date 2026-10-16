@@ -521,10 +521,12 @@ export function coalesceContents(contents: AgyContent[]): AgyContent[] {
 }
 
 /**
- * Builtin Gemini tools must not shadow functionDeclarations names (upstream
- * treats them as native tools; verified by OmniRoute's GEMINI_BUILTIN_TOOL_NAMES).
+ * Builtin Gemini grounding tool names that must not shadow functionDeclarations
+ * (`web_search` is DSH's own client-side tool from `@deepseek-ai/dsh-tool-web`
+ * and is live-verified accepted in `functionDeclarations` by both Gemini and
+ * Claude on Antigravity).
  */
-const AGY_BUILTIN_TOOL_NAMES = new Set(['google_search', 'web_search', 'search_web', 'googleSearch'])
+const AGY_BUILTIN_TOOL_NAMES = new Set(['google_search', 'search_web', 'googleSearch'])
 
 /** Level-thinking: single id + selectable low/medium/high via thinkingLevel (catalog thinking:'level'). */
 const LEVEL_THINKING_LEVELS = new Set(['low', 'medium', 'high'])
