@@ -59,13 +59,29 @@ export interface AgyAttachmentStore {
   }): Promise<{ ref: { mediaType: string }; data: Uint8Array }>
 }
 
-/** Collect image refs from user-message content only (spec scope: user images; tool-result nesting out of scope). */
+/** Collect image refs from user messages and tool results (0.2.0 tool-role and 0.1.5 tool-result blocks). */
 function collectImageRefs(options: GenerateOptions): Array<{ attachmentId: string; mediaType: string }> {
   const refs: Array<{ attachmentId: string; mediaType: string }> = []
-  for (const message of options.messages) {
-    if (message.role !== 'user') continue
-    for (const block of message.content) {
-      if (block.type === 'image') refs.push(block.attachment)
+  const collectFromBlocks = (blocks: readonly unknown[]): void => {
+    for (const raw of blocks) {
+      if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) continue
+      const block = raw as Record<string, unknown>
+      if (block.type === 'image') {
+        const att = block.attachment as Record<string, unknown> | undefined
+        if (att && typeof att.attachmentId === 'string' && typeof att.mediaType === 'string') {
+          refs.push({ attachmentId: att.attachmentId, mediaType: att.mediaType })
+        }
+      } else if (block.type === 'tool-result' && Array.isArray(block.content)) {
+        collectFromBlocks(block.content)
+      }
+    }
+  }
+  for (const rawMsg of options.messages as readonly unknown[]) {
+    if (typeof rawMsg !== 'object' || rawMsg === null || Array.isArray(rawMsg)) continue
+    const message = rawMsg as Record<string, unknown>
+    if (message.role !== 'user' && message.role !== 'tool') continue
+    if (Array.isArray(message.content)) {
+      collectFromBlocks(message.content)
     }
   }
   return refs

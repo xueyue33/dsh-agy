@@ -293,6 +293,74 @@ describe('translate', () => {
     ])
   })
 
+  it('forwards tool-result images in the following user turn while keeping parallel functionResponses grouped', () => {
+    const messages = [
+      {
+        id: 'a',
+        role: 'assistant',
+        content: [
+          { type: 'tool-call', id: 'call-1', name: 'read_image', arguments: '{"file_path":"/tmp/1.png"}' },
+          { type: 'tool-call', id: 'call-2', name: 'read_image', arguments: '{"file_path":"/tmp/2.jpg"}' },
+        ],
+      },
+      {
+        id: 't1',
+        role: 'tool',
+        toolCallId: 'call-1',
+        content: [
+          { type: 'text', text: 'image/png 1x1' },
+          { type: 'image', attachment: { attachmentId: 'att-tool-1', mediaType: 'image/png', bytes: 4, width: 1, height: 1 } },
+        ],
+      },
+      {
+        id: 't2',
+        role: 'tool',
+        toolCallId: 'call-2',
+        content: [
+          { type: 'text', text: 'image/jpeg 1x1' },
+          { type: 'image', attachment: { attachmentId: 'att-tool-2', mediaType: 'image/jpeg', bytes: 4, width: 1, height: 1 } },
+        ],
+      },
+      {
+        id: 'u1',
+        role: 'user',
+        content: [{ type: 'text', text: 'Current runtime context.' }],
+      },
+    ]
+    const images = new Map([
+      ['att-tool-1', { mediaType: 'image/png', data: 'AQ==' }],
+      ['att-tool-2', { mediaType: 'image/jpeg', data: 'Ag==' }],
+    ])
+    const body = toAgyRequestBody(
+      generateOptions({ messages: messages as unknown as GenerateOptions['messages'] }),
+      { images },
+    )
+    expect(body.request.contents).toEqual([
+      {
+        role: 'model',
+        parts: [
+          { thoughtSignature: 'skip_thought_signature_validator', functionCall: { id: 'call-1', name: 'read_image', args: { file_path: '/tmp/1.png' } } },
+          { thoughtSignature: 'skip_thought_signature_validator', functionCall: { id: 'call-2', name: 'read_image', args: { file_path: '/tmp/2.jpg' } } },
+        ],
+      },
+      {
+        role: 'user',
+        parts: [
+          { functionResponse: { id: 'call-1', name: 'read_image', response: { result: 'image/png 1x1', is_error: false } } },
+          { functionResponse: { id: 'call-2', name: 'read_image', response: { result: 'image/jpeg 1x1', is_error: false } } },
+        ],
+      },
+      {
+        role: 'user',
+        parts: [
+          { inlineData: { mimeType: 'image/png', data: 'AQ==' } },
+          { inlineData: { mimeType: 'image/jpeg', data: 'Ag==' } },
+          { text: 'Current runtime context.' },
+        ],
+      },
+    ])
+  })
+
   // A tool-call id is NOT unique across a conversation: `parse.ts` falls back
   // to `String(blockIndex)` when the upstream omits `functionCall.id` and that
   // counter restarts at 0 for every stream, so distant turns routinely answer
@@ -2870,6 +2938,45 @@ describe('AgyAdapter', () => {
     expect(bodies[0]!.request.contents[0]!.parts).toEqual([
       { inlineData: { mimeType: 'image/png', data: 'AQ==' } },
       { inlineData: { mimeType: 'image/jpeg', data: 'Ag==' } },
+    ])
+  })
+
+  it('resolves image attachments inside tool-role messages (e.g. read_image)', async () => {
+    const bodies: Array<{ request: { contents: Array<{ role: string; parts: unknown[] }> } }> = []
+    vi.stubGlobal('fetch', vi.fn(async (_url: RequestInfo | URL, init?: RequestInit) => {
+      bodies.push(JSON.parse(String(init?.body)))
+      return new Response(sseStream(['data: [DONE]']), { status: 200 })
+    }))
+    const adapter = new AgyAdapter({
+      getSession: async () => session(),
+      reportFailure: async () => {},
+      resolveAttachments: () => ({
+        readImage: async (ref: { attachmentId: string }) => ({
+          ref: { mediaType: 'image/png' },
+          data: new Uint8Array([ref.attachmentId === 'att-tool-img' ? 7 : 0]),
+        }),
+      }),
+    })
+    const messages = [
+      { id: 'u1', role: 'user', content: [{ type: 'text', text: 'inspect /tmp/x.png' }] },
+      { id: 'a1', role: 'assistant', content: [{ type: 'tool-call', id: 'call-img', name: 'read_image', arguments: '{"file_path":"/tmp/x.png"}' }] },
+      {
+        id: 't1',
+        role: 'tool',
+        toolCallId: 'call-img',
+        content: [
+          { type: 'text', text: 'image/png 10x10' },
+          { type: 'image', attachment: { attachmentId: 'att-tool-img', mediaType: 'image/png', bytes: 1, width: 10, height: 10 } },
+        ],
+      },
+    ]
+    for await (const _ of adapter.stream(generateOptions({ messages: messages as unknown as GenerateOptions['messages'] }))) void _
+    expect(bodies).toHaveLength(1)
+    expect(bodies[0]!.request.contents).toEqual([
+      { role: 'user', parts: [{ text: 'inspect /tmp/x.png' }] },
+      { role: 'model', parts: [{ thoughtSignature: 'skip_thought_signature_validator', functionCall: { id: 'call-img', name: 'read_image', args: { file_path: '/tmp/x.png' } } }] },
+      { role: 'user', parts: [{ functionResponse: { id: 'call-img', name: 'read_image', response: { result: 'image/png 10x10', is_error: false } } }] },
+      { role: 'user', parts: [{ inlineData: { mimeType: 'image/png', data: 'Bw==' } }] },
     ])
   })
 

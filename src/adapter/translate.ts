@@ -295,34 +295,52 @@ function resolveToolName(toolNames: ToolNameIndex, toolCallId: string): string |
 }
 
 /**
- * The single producer of a `functionResponse` part.
+ * The single producer of `functionResponse` (plus any tool-returned image
+ * `inlineData`) parts.
  *
  * Both supported dsh-llm vocabularies funnel through here: a 0.1.5
  * `tool-result` CONTENT BLOCK and a 0.2.0 `tool`-ROLE message describe the same
  * result, and this channel's wire shape must not depend on which one arrived.
+ * Tool-returned image blocks (e.g. from `read_image`) are emitted after the
+ * `functionResponse` part and deferred by `coalesceContents` into the
+ * immediately following ordinary `user` turn so parallel tool results remain
+ * grouped in a single unmixed `functionResponse` turn.
  */
-function toolResultPart(
+function toolResultParts(
   toolCallId: string,
   isError: boolean,
   content: readonly AgyBlockView[],
   toolNames: ToolNameIndex,
-): AgyPart {
+  images: Map<string, AgyResolvedImage>,
+): AgyPart[] {
   const name = resolveToolName(toolNames, toolCallId) ?? toolCallId
   const text = content
     .filter((block): block is Extract<AgyBlockView, { type: 'text' }> => block.type === 'text')
     .map((block) => block.text)
     .join('\n')
-  return {
-    functionResponse: {
-      // The Anthropic-backed Claude path requires tool_result.tool_use_id
-      // and 400s without it ("messages.N.content.M.tool_result.tool_use_id:
-      // Field required"); the Gemini path accepts the id too, so it is
-      // always carried rather than branched per family (live-verified).
-      id: toolCallId,
-      name,
-      response: { result: text, is_error: isError },
+  const parts: AgyPart[] = [
+    {
+      functionResponse: {
+        // The Anthropic-backed Claude path requires tool_result.tool_use_id
+        // and 400s without it ("messages.N.content.M.tool_result.tool_use_id:
+        // Field required"); the Gemini path accepts the id too, so it is
+        // always carried rather than branched per family (live-verified).
+        id: toolCallId,
+        name,
+        response: { result: text, is_error: isError },
+      },
     },
+  ]
+  for (const block of content) {
+    if (block.type === 'image') {
+      const resolved = images.get(block.attachment.attachmentId)
+      if (!resolved) {
+        throw new Error(`agy translate: unresolved image attachment "${block.attachment.attachmentId}"`)
+      }
+      parts.push({ inlineData: { mimeType: resolved.mediaType, data: resolved.data } })
+    }
   }
+  return parts
 }
 
 function blockToParts(
@@ -392,12 +410,13 @@ function blockToParts(
       }]
     }
     case 'tool-result':
-      return [toolResultPart(
+      return toolResultParts(
         block.toolCallId,
         block.isError === true,
         block.content,
         toolNames,
-      )]
+        images,
+      )
     case 'image': {
       // Bytes are pre-resolved by the adapter before translation; a missing
       // entry breaks that invariant and must fail loudly, never silently drop.
@@ -432,7 +451,7 @@ function messageToContent(
     }
     return {
       role: 'user',
-      parts: [toolResultPart(message.toolCallId, message.isError === true, message.content, toolNames)],
+      parts: toolResultParts(message.toolCallId, message.isError === true, message.content, toolNames, images),
     }
   }
 
@@ -505,9 +524,34 @@ function isFrPart(part: AgyPart): boolean {
 export function coalesceContents(contents: AgyContent[]): AgyContent[] {
   const result: AgyContent[] = []
   let lastFamily: boolean | undefined
+  const deferredMedia: AgyPart[] = []
+
+  const flushDeferredMedia = () => {
+    if (deferredMedia.length === 0) return
+    const last = result[result.length - 1]
+    if (last && lastFamily === false && last.role === 'user') {
+      last.parts.push(...deferredMedia)
+    } else {
+      result.push({ role: 'user', parts: [...deferredMedia] })
+      lastFamily = false
+    }
+    deferredMedia.length = 0
+  }
+
   for (const content of contents) {
+    const startsWithFr = content.role === 'user' && content.parts.length > 0 && isFrPart(content.parts[0]!)
+    if (!startsWithFr) {
+      flushDeferredMedia()
+    }
     for (const part of content.parts) {
       const family = isFrPart(part)
+      if (!family && lastFamily === true && 'inlineData' in part && startsWithFr) {
+        deferredMedia.push(part)
+        continue
+      }
+      if (!family) {
+        flushDeferredMedia()
+      }
       const last = result[result.length - 1]
       if (last && lastFamily === family && last.role === content.role) {
         last.parts.push(part)
@@ -517,6 +561,7 @@ export function coalesceContents(contents: AgyContent[]): AgyContent[] {
       }
     }
   }
+  flushDeferredMedia()
   return result
 }
 
