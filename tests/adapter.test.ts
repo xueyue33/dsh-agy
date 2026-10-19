@@ -2947,14 +2947,18 @@ describe('AgyAdapter', () => {
       bodies.push(JSON.parse(String(init?.body)))
       return new Response(sseStream(['data: [DONE]']), { status: 200 })
     }))
+    const seenRefs: Array<Record<string, unknown>> = []
     const adapter = new AgyAdapter({
       getSession: async () => session(),
       reportFailure: async () => {},
       resolveAttachments: () => ({
-        readImage: async (ref: { attachmentId: string }) => ({
-          ref: { mediaType: 'image/png' },
-          data: new Uint8Array([ref.attachmentId === 'att-tool-img' ? 7 : 0]),
-        }),
+        readImage: async (ref: { attachmentId: string }) => {
+          seenRefs.push(ref as Record<string, unknown>)
+          return {
+            ref: { mediaType: 'image/png' },
+            data: new Uint8Array([ref.attachmentId === 'att-tool-img' ? 7 : 0]),
+          }
+        },
       }),
     })
     const messages = [
@@ -2971,6 +2975,9 @@ describe('AgyAdapter', () => {
       },
     ]
     for await (const _ of adapter.stream(generateOptions({ messages: messages as unknown as GenerateOptions['messages'] }))) void _
+    expect(seenRefs).toEqual([
+      { attachmentId: 'att-tool-img', mediaType: 'image/png', bytes: 1, width: 10, height: 10 },
+    ])
     expect(bodies).toHaveLength(1)
     expect(bodies[0]!.request.contents).toEqual([
       { role: 'user', parts: [{ text: 'inspect /tmp/x.png' }] },

@@ -69,7 +69,7 @@ function collectImageRefs(options: GenerateOptions): Array<{ attachmentId: strin
       if (block.type === 'image') {
         const att = block.attachment as Record<string, unknown> | undefined
         if (att && typeof att.attachmentId === 'string' && typeof att.mediaType === 'string') {
-          refs.push({ attachmentId: att.attachmentId, mediaType: att.mediaType })
+          refs.push(att as { attachmentId: string; mediaType: string })
         }
       } else if (block.type === 'tool-result' && Array.isArray(block.content)) {
         collectFromBlocks(block.content)
