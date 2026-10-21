@@ -38,6 +38,12 @@ export const AGY_PUBLIC_MODELS: readonly CatalogModel[] = [
   // from Anthropic's public limits — see translate.ts AGY_CLAUDE_MAX_OUTPUT_TOKENS.
   // This value is the harness-injected default, so it must stay at or under the
   // cap or every Claude request fails.
+  { id: 'claude-sonnet-5-5-high', name: 'Claude Sonnet 5.5 (High)', contextLength: 1000000, maxOutputTokens: 64000, supportsReasoning: true, supportsVision: true, toolCalling: true },
+  { id: 'claude-sonnet-5-5-medium', name: 'Claude Sonnet 5.5 (Medium)', contextLength: 1000000, maxOutputTokens: 64000, supportsReasoning: true, supportsVision: true, toolCalling: true },
+  { id: 'claude-sonnet-5-5-low', name: 'Claude Sonnet 5.5 (Low)', contextLength: 1000000, maxOutputTokens: 64000, supportsReasoning: true, supportsVision: true, toolCalling: true },
+  { id: 'claude-opus-5-5-high', name: 'Claude Opus 5.5 (High)', contextLength: 1000000, maxOutputTokens: 64000, supportsReasoning: true, supportsVision: true, toolCalling: true },
+  { id: 'claude-opus-5-5-medium', name: 'Claude Opus 5.5 (Medium)', contextLength: 1000000, maxOutputTokens: 64000, supportsReasoning: true, supportsVision: true, toolCalling: true },
+  { id: 'claude-opus-5-5-low', name: 'Claude Opus 5.5 (Low)', contextLength: 1000000, maxOutputTokens: 64000, supportsReasoning: true, supportsVision: true, toolCalling: true },
   { id: 'claude-opus-4-6-thinking', name: 'Claude Opus 4.6 (Thinking)', contextLength: 1048576, maxOutputTokens: 64000, supportsReasoning: true, supportsVision: true, toolCalling: true },
   { id: 'claude-sonnet-4-6', name: 'Claude Sonnet 4.6 (Thinking)', contextLength: 1048576, maxOutputTokens: 64000, supportsReasoning: true, supportsVision: true, toolCalling: true },
   { id: 'gemini-pro-agent', name: 'Gemini 3.1 Pro (High)', contextLength: 1048576, maxOutputTokens: 65535, supportsReasoning: true, supportsVision: true, toolCalling: true },
@@ -45,7 +51,10 @@ export const AGY_PUBLIC_MODELS: readonly CatalogModel[] = [
   { id: 'gemini-3-flash-agent', name: 'Gemini 3.5 Flash (High)', contextLength: 1048576, maxOutputTokens: 65536, supportsReasoning: true, supportsVision: true, toolCalling: true },
   { id: 'gemini-3.5-flash-low', name: 'Gemini 3.5 Flash (Medium)', contextLength: 1048576, maxOutputTokens: 65536, supportsReasoning: true, supportsVision: true, toolCalling: true },
   { id: 'gemini-3.5-flash-extra-low', name: 'Gemini 3.5 Flash (Low)', contextLength: 1048576, maxOutputTokens: 65536, supportsReasoning: true, supportsVision: true, toolCalling: true },
+  { id: 'gemini-3-flash', name: 'Gemini 3 Flash', contextLength: 1048576, maxOutputTokens: 65536, supportsReasoning: true, supportsVision: true, toolCalling: true },
+  { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro', contextLength: 1048576, maxOutputTokens: 65535, supportsReasoning: true, supportsVision: true, toolCalling: true },
   { id: 'gemini-3.1-flash-lite', name: 'Gemini 3.1 Flash Lite', contextLength: 1048576, maxOutputTokens: 65535, supportsVision: true, toolCalling: true },
+  { id: 'gemini-3.5-flash-lite', name: 'Gemini 3.5 Flash Lite', contextLength: 1048576, maxOutputTokens: 65535, supportsVision: true, toolCalling: true },
   { id: 'gemini-2.5-flash-thinking', name: 'Gemini 2.5 Flash Thinking', contextLength: 1048576, maxOutputTokens: 65535, supportsReasoning: true, supportsVision: true, toolCalling: true },
   { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', contextLength: 1048576, maxOutputTokens: 65535, supportsVision: true, toolCalling: true },
   { id: 'gemini-2.5-flash-lite', name: 'Gemini 2.5 Flash Lite', contextLength: 1048576, maxOutputTokens: 65535, supportsVision: true, toolCalling: true },
@@ -94,6 +103,30 @@ export function catalogModel(modelId: string): CatalogModel | undefined {
       supportsVision: true,
       toolCalling: true,
       thinking: 'level',
+    }
+  }
+  if (typeof modelId === 'string') {
+    if (modelId.startsWith('gemini-')) {
+      return {
+        id: modelId,
+        name: formatTieredModelName(modelId),
+        contextLength: 1048576,
+        maxOutputTokens: 65536,
+        supportsReasoning: true,
+        supportsVision: true,
+        toolCalling: true,
+      }
+    }
+    if (modelId.startsWith('claude-')) {
+      return {
+        id: modelId,
+        name: formatTieredModelName(modelId),
+        contextLength: 1000000,
+        maxOutputTokens: 64000,
+        supportsReasoning: true,
+        supportsVision: true,
+        toolCalling: true,
+      }
     }
   }
   return undefined

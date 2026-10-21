@@ -278,6 +278,7 @@ export function resolveAgyModel(provider: string, model: string): LlmResolvedMod
     id: model,
     name: meta?.name ?? model,
     inputModalities: inputModalitiesFor(meta),
-    ...(meta ? { context: { contextWindow: meta.contextLength }, defaultMaxTokens: meta.maxOutputTokens } : {}),
+    context: { contextWindow: meta?.contextLength ?? 1048576 },
+    ...(meta?.maxOutputTokens !== undefined ? { defaultMaxTokens: meta.maxOutputTokens } : {}),
   }
 }

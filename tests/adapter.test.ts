@@ -1814,6 +1814,21 @@ describe('models', () => {
     const unknown = resolveAgyModel('agy', 'brand-new-model')
     expect(unknown.name).toBe('brand-new-model')
     expect(unknown.defaultMaxTokens).toBeUndefined()
+    expect(unknown.context?.contextWindow).toBe(1048576)
+
+    const argon = resolveAgyModel('agy', 'gemini-4-argon-medium')
+    expect(argon.name).toContain('Gemini 4 Argon')
+    expect(argon.context?.contextWindow).toBe(1048576)
+    expect(argon.defaultMaxTokens).toBe(65536)
+
+    const sonnet55 = resolveAgyModel('agy', 'claude-sonnet-5-5-medium')
+    expect(sonnet55.name).toContain('Claude Sonnet 5.5')
+    expect(sonnet55.context?.contextWindow).toBe(1000000)
+    expect(sonnet55.defaultMaxTokens).toBe(AGY_CLAUDE_MAX_OUTPUT_TOKENS)
+
+    const dynamicClaude = resolveAgyModel('agy', 'claude-future-model')
+    expect(dynamicClaude.context?.contextWindow).toBe(1000000)
+    expect(dynamicClaude.defaultMaxTokens).toBe(AGY_CLAUDE_MAX_OUTPUT_TOKENS)
   })
 
   it('keeps every catalog default maxTokens within what upstream accepts', () => {
